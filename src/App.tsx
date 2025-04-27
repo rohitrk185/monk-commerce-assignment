@@ -147,97 +147,100 @@ function App() {
   }
 
   //  Drag and Drop Handling
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
-    const { active, over } = event
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event
 
-    if (!over) return // Dropped outside a droppable area
+      if (!over) return // Dropped outside a droppable area
 
-    const activeId = active.id
-    const overId = over.id
+      const activeId = active.id
+      const overId = over.id
 
-    if (activeId === overId) return // Dropped in the same place
+      if (activeId === overId) return // Dropped in the same place
 
-    const activeType = active.data.current?.type
-    const overType = over.data.current?.type
+      const activeType = active.data.current?.type
+      const overType = over.data.current?.type
 
-    console.log('Drag End:', { activeId, overId, activeType, overType })
-    console.log('Active Data:', active.data.current)
-    console.log('Over Data:', over.data.current)
+      console.log('Drag End:', { activeId, overId, activeType, overType })
+      console.log('Active Data:', active.data.current)
+      console.log('Over Data:', over.data.current)
 
-    setSelectedProducts(
-      produce((draft) => {
-        if (activeType === 'PRODUCT' && overType === 'PRODUCT') {
-          // Reordering Products
-          setSelectedProducts((currentProducts) => {
-            const oldIndex = currentProducts.findIndex(
-              (p) => p.localId === activeId
-            )
-            const newIndex = currentProducts.findIndex(
-              (p) => p.localId === overId
-            )
+      setSelectedProducts(
+        produce((draft) => {
+          if (activeType === 'PRODUCT' && overType === 'PRODUCT') {
+            // Reordering Products
+            setSelectedProducts((currentProducts) => {
+              const oldIndex = currentProducts.findIndex(
+                (p) => p.localId === activeId
+              )
+              const newIndex = currentProducts.findIndex(
+                (p) => p.localId === overId
+              )
 
-            // console.log(
-            //   'a) oldIndex: ',
-            //   oldIndex,
-            //   '\nb)newIndex: ',
-            //   newIndex,
-            //   '\nc)currentProducts: ',
-            //   currentProducts
-            // )
+              // console.log(
+              //   'a) oldIndex: ',
+              //   oldIndex,
+              //   '\nb)newIndex: ',
+              //   newIndex,
+              //   '\nc)currentProducts: ',
+              //   currentProducts
+              // )
 
-            if (oldIndex !== -1 && newIndex !== -1) {
-              const newArr = arrayMove(currentProducts, oldIndex, newIndex)
-              // console.log('newArr: ', newArr)
-              return newArr
-            }
-            // Return original array if indices are invalid
-            return currentProducts
-          })
-        } else if (activeType === 'VARIANT' && overType === 'VARIANT') {
-          // Reordering Variants within the same product
-          // Find the product containing these variants
-          let productIndex = -1
-          for (let i = 0; i < draft.length; i++) {
-            if (draft[i].variants.some((v) => v.localId === activeId)) {
-              productIndex = i
-              break
-            }
-          }
-
-          if (productIndex !== -1) {
-            const product = draft[productIndex]
-            const oldVariantIndex = product.variants.findIndex(
-              (v) => v.localId === activeId
-            )
-            // Find new index based on the item being dropped over
-            const newVariantIndex = product.variants.findIndex(
-              (v) => v.localId === overId
-            )
-
-            if (oldVariantIndex !== -1 && newVariantIndex !== -1) {
-              // Check if variants belong to the same product
-              if (product.variants.some((v) => v.localId === overId)) {
-                const movedVariant = product.variants[oldVariantIndex]
-                product.variants.splice(oldVariantIndex, 1)
-                product.variants.splice(newVariantIndex, 0, movedVariant)
-              } else {
-                console.warn(
-                  'Cannot move variant to a different product list (yet).'
-                )
+              if (oldIndex !== -1 && newIndex !== -1) {
+                const newArr = arrayMove(currentProducts, oldIndex, newIndex)
+                // console.log('newArr: ', newArr)
+                return newArr
+              }
+              // Return original array if indices are invalid
+              return currentProducts
+            })
+          } else if (activeType === 'VARIANT' && overType === 'VARIANT') {
+            // Reordering Variants within the same product
+            // Find the product containing these variants
+            let productIndex = -1
+            for (let i = 0; i < draft.length; i++) {
+              if (draft[i].variants.some((v) => v.localId === activeId)) {
+                productIndex = i
+                break
               }
             }
+
+            if (productIndex !== -1) {
+              const product = draft[productIndex]
+              const oldVariantIndex = product.variants.findIndex(
+                (v) => v.localId === activeId
+              )
+              // Find new index based on the item being dropped over
+              const newVariantIndex = product.variants.findIndex(
+                (v) => v.localId === overId
+              )
+
+              if (oldVariantIndex !== -1 && newVariantIndex !== -1) {
+                // Check if variants belong to the same product
+                if (product.variants.some((v) => v.localId === overId)) {
+                  const movedVariant = product.variants[oldVariantIndex]
+                  product.variants.splice(oldVariantIndex, 1)
+                  product.variants.splice(newVariantIndex, 0, movedVariant)
+                } else {
+                  console.warn(
+                    'Cannot move variant to a different product list (yet).'
+                  )
+                }
+              }
+            }
+          } else {
+            console.log(
+              'Unhandled drag/drop combination:',
+              activeType,
+              'over',
+              overType
+            )
           }
-        } else {
-          console.log(
-            'Unhandled drag/drop combination:',
-            activeType,
-            'over',
-            overType
-          )
-        }
-      })
-    )
-  }, [])
+        })
+      )
+    },
+    [setSelectedProducts]
+  )
 
   return (
     <div className="container mx-auto p-4 max-w-4xl">
