@@ -176,17 +176,19 @@ function App() {
               (p) => p.localId === overId
             )
 
-            console.log(
-              'oldIndex: ',
-              oldIndex,
-              'newIndex: ',
-              newIndex,
-              'currentProducts: ',
-              currentProducts
-            )
+            // console.log(
+            //   'a) oldIndex: ',
+            //   oldIndex,
+            //   '\nb)newIndex: ',
+            //   newIndex,
+            //   '\nc)currentProducts: ',
+            //   currentProducts
+            // )
 
             if (oldIndex !== -1 && newIndex !== -1) {
-              return arrayMove(currentProducts, oldIndex, newIndex)
+              const newArr = arrayMove(currentProducts, oldIndex, newIndex)
+              // console.log('newArr: ', newArr)
+              return newArr
             }
             // Return original array if indices are invalid
             return currentProducts
