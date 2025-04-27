@@ -1,4 +1,15 @@
-import { useState, useEffect, Fragment, FC, ChangeEvent } from 'react'
+import {
+  useState,
+  useEffect,
+  Fragment,
+  FC,
+  ChangeEvent,
+  useMemo,
+  useCallback,
+  memo,
+} from 'react'
+import { VariableSizeList as List } from 'react-window'
+import InfiniteLoader from 'react-window-infinite-loader'
 import {
   Dialog,
   DialogPanel,
@@ -10,14 +21,144 @@ import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { CheckCircleIcon } from '@heroicons/react/24/solid'
 import { fetchProducts as fetchProductsApi } from '../services/api'
 import { useDebounce } from '../hooks/useDebounce'
-import { useInfiniteScroll } from '../hooks/useInfiniteScroll'
 import type { ApiProduct, ApiVariant, SelectedVariantInfo } from '../types'
+
+interface RowData {
+  products: ApiProduct[]
+  selectedVariants: Record<string, SelectedVariantInfo>
+  toggleVariantSelection: (variant: ApiVariant, product: ApiProduct) => void
+  selectAllProductVariants: (product: ApiProduct) => void
+  hasMore: boolean
+  itemCount: number
+}
+
+// Row component
+const Row = memo(
+  ({
+    index,
+    style,
+    data,
+  }: {
+    index: number
+    style: React.CSSProperties
+    data: RowData
+  }) => {
+    const {
+      products,
+      selectedVariants,
+      toggleVariantSelection,
+      selectAllProductVariants,
+      hasMore,
+      itemCount,
+    } = data
+
+    if (hasMore && index === itemCount - 1) {
+      return (
+        <div
+          style={style}
+          className="flex items-center justify-center text-gray-500 text-sm"
+        >
+          Loading more...
+        </div>
+      )
+    }
+
+    //  Find the corresponding Product or Variant for the index
+    let cumulativeCount = 0
+    let item:
+      | { type: 'product'; product: ApiProduct }
+      | { type: 'variant'; variant: ApiVariant; product: ApiProduct }
+      | null = null
+
+    for (const product of products) {
+      // Check if index is the header
+      if (index === cumulativeCount) {
+        item = { type: 'product', product: product }
+        break
+      }
+      cumulativeCount += 1 // Account for header
+
+      // Check if index is one of the variants
+      const variantIndex = index - cumulativeCount
+      if (variantIndex >= 0 && variantIndex < product.variants.length) {
+        item = {
+          type: 'variant',
+          variant: product.variants[variantIndex],
+          product: product,
+        }
+        break
+      }
+      cumulativeCount += product.variants.length // Account for variants
+    }
+
+    if (!item) {
+      console.warn('Row: Could not find item for index', index)
+      return <div style={style}>Error: Item not found</div>
+    }
+
+    return (
+      <div style={style}>
+        {/* Render Product Header */}
+        {item.type === 'product' && (
+          <div
+            className="flex items-center justify-between p-2 border-b border-gray-200 h-full bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors duration-150"
+            onClick={() => selectAllProductVariants(item.product)}
+            title={`Click to select/deselect all variants for ${item.product.title}`}
+          >
+            {/* Left side (Image and Title) */}
+            <div className="flex items-center space-x-2 overflow-hidden">
+              <img
+                src={item.product.image?.src}
+                alt={item.product.title}
+                className="w-8 h-8 object-cover rounded border flex-shrink-0"
+                onError={(e) =>
+                  (e.currentTarget.src = 'https://via.placeholder.com/32')
+                }
+              />
+              <span className="font-medium text-sm truncate">
+                {item.product.title}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Render Variant Row */}
+        {item.type === 'variant' && (
+          <div className="flex items-center justify-between cursor-pointer p-2 pl-6 h-full hover:bg-gray-100 border-b border-gray-100">
+            {' '}
+            <div
+              className="flex items-center space-x-2 overflow-hidden flex-grow"
+              onClick={() => toggleVariantSelection(item.variant, item.product)}
+            >
+              <div className="w-5 h-5 flex-shrink-0">
+                {selectedVariants[
+                  `${item.variant.product_id}-${item.variant.id}`
+                ] ? (
+                  <CheckCircleIcon className="w-5 h-5 text-green-500" />
+                ) : (
+                  <div className="w-4 h-4 border border-gray-400 rounded-full"></div>
+                )}
+              </div>
+              <span className="text-sm text-gray-700 truncate">
+                {item.variant.title}
+              </span>
+            </div>
+            <span className="text-sm text-gray-500 flex-shrink-0 ml-2">
+              ${item.variant.price}
+            </span>
+          </div>
+        )}
+      </div>
+    )
+  }
+)
+Row.displayName = 'VirtualizedRow'
 
 interface ProductPickerProps {
   isOpen: boolean
   onClose: () => void
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onSelectProducts: (selectedProducts: any[]) => void // Use a more specific type later if needed
+  onSelectProducts: (selectedProducts: any[]) => void
 }
 
 const ProductPicker: FC<ProductPickerProps> = ({
@@ -29,54 +170,53 @@ const ProductPicker: FC<ProductPickerProps> = ({
   const [products, setProducts] = useState<ApiProduct[]>([])
   const [selectedVariants, setSelectedVariants] = useState<
     Record<string, SelectedVariantInfo>
-  >({}) // Stores selected variant info by localId
+  >({})
   const [page, setPage] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const debouncedSearchTerm = useDebounce(searchTerm, 500) // 500ms debounce
+  const debouncedSearchTerm = useDebounce(searchTerm, 500)
 
-  const loadProducts = async (
-    term: string,
-    currentPage: number,
-    reset: boolean = false
-  ) => {
-    if (isLoading || (!hasMore && !reset)) return
-    setIsLoading(true)
-    setError(null)
-    try {
-      // Use the correct localId generation from the api service
-      const fetchedProducts = await fetchProductsApi(term, currentPage, 10)
-      if (reset) {
-        setProducts(fetchedProducts)
-      } else {
-        // Filter out duplicates just in case API returns overlapping items on pagination
-        setProducts((prev) => [
-          ...prev,
-          ...fetchedProducts.filter((fp) => !prev.some((p) => p.id === fp.id)),
-        ])
+  const loadProducts = useCallback(
+    async (term: string, currentPage: number, reset: boolean = false) => {
+      if (isLoading || (!hasMore && !reset)) return
+      setIsLoading(true)
+      setError(null)
+      try {
+        const fetchedProducts = await fetchProductsApi(term, currentPage, 10)
+        if (reset) {
+          setProducts(fetchedProducts)
+        } else {
+          setProducts((prev) => [
+            ...prev,
+            ...fetchedProducts.filter(
+              (fp) => !prev.some((p) => p.id === fp.id)
+            ),
+          ])
+        }
+        setHasMore(fetchedProducts.length === 10)
+        setPage(currentPage + 1)
+      } catch (err) {
+        console.error('Failed to load products:', err)
+        setError('Failed to load products. Please try again.')
+      } finally {
+        setIsLoading(false)
       }
-      setHasMore(fetchedProducts.length === 10)
-      setPage(currentPage + 1)
-    } catch (err) {
-      console.error('Failed to load products:', err)
-      setError('Failed to load products. Please try again.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
+    },
+    [hasMore, isLoading]
+  )
 
   // Effect for initial load and search term changes
   useEffect(() => {
-    // Reset everything when search term changes
+    // Reset everything
     setProducts([])
     setPage(1)
     setHasMore(true)
-    setSelectedVariants({}) // Clear selection on new search
+    setSelectedVariants({})
     loadProducts(debouncedSearchTerm, 1, true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearchTerm]) // Dependency: debounced search term
+  }, [debouncedSearchTerm])
 
   // Effect to reset state when modal closes
   useEffect(() => {
@@ -90,18 +230,6 @@ const ProductPicker: FC<ProductPickerProps> = ({
       setError(null)
     }
   }, [isOpen])
-
-  // Infinite scroll setup
-  const lastElementRef = useInfiniteScroll({
-    loading: isLoading,
-    hasMore: hasMore,
-    onLoadMore: () => {
-      if (!isLoading && hasMore) {
-        loadProducts(debouncedSearchTerm, page)
-      }
-    },
-    disabled: !isOpen, // Disable when modal is closed
-  })
 
   const handleSearchChange = (event: ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value)
@@ -133,23 +261,42 @@ const ProductPicker: FC<ProductPickerProps> = ({
   }
 
   const handleSelectAllProductVariants = (product: ApiProduct) => {
-    setSelectedVariants((prev) => {
-      const newSelected = { ...prev }
-      product.variants.forEach((variant) => {
-        const localVariantId = `${variant.product_id}-${variant.id}`
-        if (!newSelected[localVariantId]) {
-          // Only select if not already selected
+    setSelectedVariants((prevSelected) => {
+      const allVariantIds = product.variants.map(
+        (v) => `${v.product_id}-${v.id}`
+      )
+
+      // Check if every variant ID for this product exists in the current selection
+      const areAllSelected = allVariantIds.every((id) => !!prevSelected[id])
+
+      const newSelected = { ...prevSelected } // Create a mutable copy
+
+      if (areAllSelected) {
+        //  DESELECT ALL
+        // If all are currently selected, remove them from the new selection object
+        allVariantIds.forEach((id) => {
+          delete newSelected[id]
+        })
+        console.log(`Deselecting all variants for product ${product.id}`)
+      } else {
+        //  SELECT ALL
+        // If not all are selected, add/overwrite all variants for this product
+        product.variants.forEach((variant) => {
+          const localVariantId = `${variant.product_id}-${variant.id}`
           newSelected[localVariantId] = {
-            ...(variant as SelectedVariantInfo),
+            ...(variant as SelectedVariantInfo), // Use existing variant data
             localId: localVariantId,
             productTitle: product.title,
             productImageSrc: product.image?.src,
-            discountType: null,
-            discountValue: null,
+            // Ensure discount fields are initialized/preserved if needed
+            discountType: prevSelected[localVariantId]?.discountType ?? null,
+            discountValue: prevSelected[localVariantId]?.discountValue ?? null,
           }
-        }
-      })
-      return newSelected
+        })
+        console.log(`Selecting all variants for product ${product.id}`)
+      }
+
+      return newSelected // Return the updated selection state
     })
   }
 
@@ -173,7 +320,7 @@ const ProductPicker: FC<ProductPickerProps> = ({
             isPlaceholder: false,
           }
         }
-        // Add the variant (ensure it has the required fields)
+        // Add the variant
         acc[productId].variants.push({
           ...variant,
           // Ensure discount fields exist if not already added
@@ -181,11 +328,10 @@ const ProductPicker: FC<ProductPickerProps> = ({
           discountValue: variant.discountValue ?? null,
         })
         return acc
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       {} as Record<number, any>
-    ) // Use 'any' temporarily, refine type if needed
+    )
 
     onSelectProducts(Object.values(variantsByProduct))
     onClose()
@@ -193,7 +339,77 @@ const ProductPicker: FC<ProductPickerProps> = ({
 
   const totalSelectedCount = Object.keys(selectedVariants).length
 
-  console.log('Products: ', products)
+  const PRODUCT_HEADER_HEIGHT = 56
+  const VARIANT_ROW_HEIGHT = 60
+  const LOADER_HEIGHT = 50
+
+  const { itemCount } = useMemo(() => {
+    let count = 0
+    const indices: number[] = [] // Store the starting index of each product in the virtual list
+    products.forEach((product) => {
+      indices.push(count) // The header starts at the current count
+      count += 1 // Add 1 for the product header
+      count += product.variants.length // Add count for variants
+    })
+    // Add 1 for the loader row if there are more items to load
+    const finalCount = hasMore ? count + 1 : count
+    return { itemCount: finalCount, productStartIndices: indices }
+  }, [products, hasMore])
+
+  const getItemSize = useCallback(
+    (index: number): number => {
+      // Check if it's the loader row (the very last item if hasMore is true)
+      if (hasMore && index === itemCount - 1) {
+        return LOADER_HEIGHT
+      }
+
+      // Iterate through products to find which item this index corresponds to
+      let cumulativeCount = 0
+      for (const product of products) {
+        // Check if index is the header for this product
+        if (index === cumulativeCount) {
+          return PRODUCT_HEADER_HEIGHT
+        }
+        cumulativeCount += 1 // Account for the header
+
+        // Check if index falls within the variants of this product
+        if (index < cumulativeCount + product.variants.length) {
+          return VARIANT_ROW_HEIGHT
+        }
+        cumulativeCount += product.variants.length // Account for variants
+      }
+
+      console.warn('getItemSize: Index out of bounds?', index)
+      return VARIANT_ROW_HEIGHT
+    },
+    [products, hasMore, itemCount]
+  )
+
+  const handleVariantSelectToggleCallback = useCallback(
+    (variant: ApiVariant, product: ApiProduct) => {
+      handleVariantSelectToggle(variant, product)
+    },
+    []
+  )
+
+  const handleSelectAllProductVariantsCallback = useCallback(
+    (product: ApiProduct) => {
+      handleSelectAllProductVariants(product)
+    },
+    []
+  )
+
+  const isItemLoaded = (index: number) => !hasMore || index < itemCount - 1
+
+  // Function for InfiniteLoader to trigger loading more items
+  const loadMoreItems = useCallback(() => {
+    if (isLoading || !hasMore) {
+      console.log('InfiniteLoader: Skipping loadMoreItems')
+      return
+    }
+    console.log('InfiniteLoader: Triggering loadMoreItems')
+    return loadProducts(debouncedSearchTerm, page)
+  }, [isLoading, hasMore, loadProducts, debouncedSearchTerm, page])
 
   return (
     <Transition appear show={isOpen} as={Fragment}>
@@ -248,17 +464,17 @@ const ProductPicker: FC<ProductPickerProps> = ({
                   </div>
 
                   {/* Product List Area */}
-                  <div className="max-h-[50vh] overflow-y-auto pr-2">
+                  <div className="flex-grow h-[50vh] w-full overflow-hidden">
                     {' '}
-                    {/* Scrollable Area */}
                     {error && (
-                      <p className="text-red-500 text-center">{error}</p>
+                      <p className="text-red-500 text-center p-4">{error}</p>
                     )}
+                    {/* Empty/No Results States */}
                     {!isLoading &&
                       products.length === 0 &&
                       !error &&
                       debouncedSearchTerm && (
-                        <p className="text-gray-500 text-center">
+                        <p className="text-gray-500 text-center p-4">
                           No products found for "{debouncedSearchTerm}".
                         </p>
                       )}
@@ -266,88 +482,44 @@ const ProductPicker: FC<ProductPickerProps> = ({
                       products.length === 0 &&
                       !error &&
                       !debouncedSearchTerm && (
-                        <p className="text-gray-500 text-center">
+                        <p className="text-gray-500 text-center p-4">
                           Start typing to search for products.
                         </p>
                       )}
-                    {products.map((product) => (
-                      <div key={product.id} className="mb-3 border rounded p-2">
-                        {/* Product Header */}
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center space-x-2">
-                            <img
-                              src={product.image?.src}
-                              alt={product.title}
-                              className="w-8 h-8 object-cover rounded border"
-                              onError={(e) =>
-                                (e.currentTarget.src =
-                                  'https://via.placeholder.com/32')
-                              }
-                            />
-                            <span className="font-medium text-sm">
-                              {product.title}
-                            </span>
-                          </div>
-                          <button
-                            onClick={() =>
-                              handleSelectAllProductVariants(product)
-                            }
-                            className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50"
-                            title={`Select all variants for ${product.title}`}
-                          >
-                            Select All
-                          </button>
-                        </div>
-                        {/* Variant List */}
-                        <div className="space-y-1 pl-4">
-                          {product.variants.map((variant) => {
-                            const localVariantId = `${variant.product_id}-${variant.id}`
-                            const isSelected =
-                              !!selectedVariants[localVariantId]
-                            return (
-                              <div
-                                key={variant.id}
-                                className="flex items-center justify-between cursor-pointer p-1 rounded hover:bg-gray-100"
-                                onClick={() =>
-                                  handleVariantSelectToggle(variant, product)
-                                }
-                              >
-                                <div className="flex items-center space-x-2">
-                                  <div className="w-5 h-5">
-                                    {' '}
-                                    {/* Checkbox area */}
-                                    {isSelected && (
-                                      <CheckCircleIcon className="w-5 h-5 text-green-500" />
-                                    )}
-                                    {!isSelected && (
-                                      <div className="w-4 h-4 border border-gray-400 rounded-full"></div>
-                                    )}
-                                  </div>
-                                  <span className="text-sm text-gray-700">
-                                    {variant.title}
-                                  </span>
-                                </div>
-                                <span className="text-sm text-gray-500">
-                                  ${variant.price}
-                                </span>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                    {/* Loader / End of List Indicator */}
-                    <div
-                      ref={lastElementRef}
-                      className="h-10 flex items-center justify-center"
-                    >
-                      {isLoading && (
-                        <p className="text-gray-500 text-sm">Loading more...</p>
+                    {!error &&
+                      (products.length > 0 || isLoading || hasMore) && (
+                        <InfiniteLoader
+                          isItemLoaded={isItemLoaded}
+                          itemCount={itemCount}
+                          loadMoreItems={loadMoreItems}
+                          threshold={10} // Load when 10 items from the end are visible
+                        >
+                          {({ onItemsRendered, ref }) => (
+                            <List
+                              height={window.innerHeight * 0.5}
+                              itemCount={itemCount}
+                              itemSize={getItemSize}
+                              width="100%"
+                              onItemsRendered={onItemsRendered}
+                              ref={ref}
+                              itemData={{
+                                products: products,
+                                selectedVariants: selectedVariants,
+                                toggleVariantSelection:
+                                  handleVariantSelectToggleCallback,
+                                selectAllProductVariants:
+                                  handleSelectAllProductVariantsCallback,
+                                hasMore: hasMore,
+                                itemCount: itemCount,
+                              }}
+                              className="overflow-y-auto"
+                              overscanCount={20}
+                            >
+                              {Row}
+                            </List>
+                          )}
+                        </InfiniteLoader>
                       )}
-                      {!isLoading && !hasMore && products.length > 0 && (
-                        <p className="text-gray-500 text-sm">End of results.</p>
-                      )}
-                    </div>
                   </div>
                 </div>
 

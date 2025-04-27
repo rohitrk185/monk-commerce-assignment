@@ -1,10 +1,7 @@
-// src/services/api.ts
 import axios from 'axios'
 import type { ApiProduct } from '../types'
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  'https://stageapi.monkcommerce.app/task/products'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 const API_KEY = import.meta.env.VITE_MONK_API_KEY
 
 const apiClient = axios.create({
@@ -37,7 +34,7 @@ export const fetchProducts = async (
         limit: limit,
       },
     })
-    // Assign a temporary localId based on API IDs for initial tracking
+
     return response.data.map((product) => ({
       ...product,
       variants: product.variants.map((variant) => ({
@@ -47,7 +44,6 @@ export const fetchProducts = async (
     }))
   } catch (error) {
     console.error('Error fetching products:', error)
-    // Improve error handling (e.g., throw error, return specific error object)
     return []
   }
 }

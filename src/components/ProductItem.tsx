@@ -4,8 +4,6 @@ import {
   Bars3Icon,
   PencilSquareIcon,
   TrashIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
 } from '@heroicons/react/24/outline'
 import DiscountInput from './DiscountInput'
 import VariantList from './VariantList'
@@ -51,7 +49,7 @@ const ProductItem: FC<ProductItemProps> = ({
     isDragging,
   } = useSortable({
     id: product.localId,
-    data: { type: 'PRODUCT', product: product }, // Add data for context
+    data: { type: 'PRODUCT', product: product },
   })
 
   const style = {
@@ -109,7 +107,7 @@ const ProductItem: FC<ProductItemProps> = ({
               className="w-12 h-12 object-cover rounded border border-gray-200"
               onError={(e) =>
                 (e.currentTarget.src = 'https://via.placeholder.com/50')
-              } // Basic fallback
+              }
             />
           )}
           <span className="text-sm font-medium text-gray-800">
@@ -132,6 +130,7 @@ const ProductItem: FC<ProductItemProps> = ({
 
         {/* Actions */}
         <div className="flex items-center space-x-2">
+          {/* Edit Button */}
           <button
             title="Edit/Select Product"
             onClick={() => onEdit(index)}
@@ -139,19 +138,19 @@ const ProductItem: FC<ProductItemProps> = ({
           >
             <PencilSquareIcon className="h-5 w-5" />
           </button>
+
           {hasMultipleVariants && !product.isPlaceholder && (
             <button
-              title={product.showVariants ? 'Hide Variants' : 'Show Variants'}
               onClick={() => onToggleVariants(product.localId)}
-              className="text-gray-500 hover:text-gray-700 p-1"
+              className="text-sm font-medium text-indigo-600 hover:text-indigo-800 p-1 rounded hover:bg-indigo-50 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              title={product.showVariants ? 'Hide Variants' : 'Show Variants'}
             >
-              {product.showVariants ? (
-                <ChevronUpIcon className="h-5 w-5" />
-              ) : (
-                <ChevronDownIcon className="h-5 w-5" />
-              )}
+              {product.showVariants ? 'Hide' : 'Show'} Variants
+              {/* {product.showVariants ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />} */}
             </button>
           )}
+
+          {/* Delete Button */}
           {totalProducts > 1 && (
             <button
               title="Remove Product"
@@ -164,13 +163,12 @@ const ProductItem: FC<ProductItemProps> = ({
         </div>
       </div>
 
-      {/* Variants List (Conditionally Rendered) */}
+      {/* Variants List */}
       {hasMultipleVariants &&
         product.showVariants &&
         !product.isPlaceholder && (
-          <div className="p-2 pt-0">
+          <div className="p-3 pt-2">
             {' '}
-            {/* Add padding around variant list */}
             <VariantList
               productId={product.localId}
               variants={product.variants}

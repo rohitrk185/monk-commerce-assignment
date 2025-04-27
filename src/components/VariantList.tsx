@@ -4,7 +4,7 @@ import VariantItem from './VariantItem'
 import type { Variant, DiscountType } from '../types'
 
 interface VariantListProps {
-  productId: string // Local ID of the parent product
+  productId: string
   variants: Variant[]
   onUpdateVariantDiscount: (
     variantLocalId: string,
@@ -17,7 +17,6 @@ const VariantList: FC<VariantListProps> = ({
   variants,
   onUpdateVariantDiscount,
 }) => {
-  // Extract just the localIds for SortableContext
   const variantIds = variants.map((v) => v.localId)
 
   return (

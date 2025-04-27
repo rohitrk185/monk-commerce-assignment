@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { produce } from 'immer' // Import immer
+import { produce } from 'immer'
 import {
   DndContext,
   closestCenter,
@@ -9,7 +9,7 @@ import {
   useSensors,
   DragEndEvent,
 } from '@dnd-kit/core'
-import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
+import { sortableKeyboardCoordinates, arrayMove } from '@dnd-kit/sortable'
 
 import ProductList from './components/ProductList'
 import ProductPicker from './components/ProductPicker'
@@ -30,13 +30,13 @@ function App() {
     })
   )
 
-  // --- Product Handling ---
+  // Product Handling
   const handleAddProduct = () => {
     // Add a placeholder product
     const newPlaceholder: Product = {
-      localId: `placeholder-${crypto.randomUUID()}`, // Unique ID for the placeholder row
-      title: '', // Placeholder doesn't have API data yet
-      variants: [], // No variants initially for placeholder
+      localId: `placeholder-${crypto.randomUUID()}`,
+      title: '',
+      variants: [],
       image: null,
       discountType: null,
       discountValue: null,
@@ -77,15 +77,24 @@ function App() {
     )
   }, [])
 
-  // --- Discount Handling ---
+  // Discount Handling
   const handleUpdateProductDiscount = useCallback(
     (localId: string, type: DiscountType | null, value: number | null) => {
       setSelectedProducts(
         produce((draft) => {
           const product = draft.find((p) => p.localId === localId)
           if (product) {
+            // 1. Update the main product's discount
             product.discountType = type
             product.discountValue = value
+
+            // 2. Iterate through the product's variants and update their discounts
+            if (product.variants && product.variants.length > 0) {
+              product.variants.forEach((variant) => {
+                variant.discountType = type
+                variant.discountValue = value
+              })
+            }
           }
         })
       )
@@ -109,7 +118,7 @@ function App() {
             if (variant) {
               variant.discountType = type
               variant.discountValue = value
-              break // Stop searching once found
+              break
             }
           }
         })
@@ -118,14 +127,14 @@ function App() {
     []
   )
 
-  // --- Product Picker Handling ---
+  //  Product Picker Handling
   const handleClosePicker = () => {
     setIsPickerOpen(false)
     setEditingProductIndex(null)
   }
 
   const handleProductSelection = (newlySelectedProducts: Product[]) => {
-    if (editingProductIndex === null) return // Should not happen if opened via edit
+    if (editingProductIndex === null) return
 
     setSelectedProducts(
       produce((draft) => {
@@ -137,7 +146,7 @@ function App() {
     handleClosePicker()
   }
 
-  // --- Drag and Drop Handling ---
+  //  Drag and Drop Handling
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event
 
@@ -159,15 +168,29 @@ function App() {
       produce((draft) => {
         if (activeType === 'PRODUCT' && overType === 'PRODUCT') {
           // Reordering Products
-          const oldIndex = draft.findIndex((p) => p.localId === activeId)
-          const newIndex = draft.findIndex((p) => p.localId === overId)
+          setSelectedProducts((currentProducts) => {
+            const oldIndex = currentProducts.findIndex(
+              (p) => p.localId === activeId
+            )
+            const newIndex = currentProducts.findIndex(
+              (p) => p.localId === overId
+            )
 
-          if (oldIndex !== -1 && newIndex !== -1) {
-            const movedItem = draft[oldIndex]
-            draft.splice(oldIndex, 1)
-            draft.splice(newIndex, 0, movedItem)
-            // return arrayMove(draft, oldIndex, newIndex); // Use arrayMove if not using immer
-          }
+            console.log(
+              'oldIndex: ',
+              oldIndex,
+              'newIndex: ',
+              newIndex,
+              'currentProducts: ',
+              currentProducts
+            )
+
+            if (oldIndex !== -1 && newIndex !== -1) {
+              return arrayMove(currentProducts, oldIndex, newIndex)
+            }
+            // Return original array if indices are invalid
+            return currentProducts
+          })
         } else if (activeType === 'VARIANT' && overType === 'VARIANT') {
           // Reordering Variants within the same product
           // Find the product containing these variants
@@ -184,18 +207,17 @@ function App() {
             const oldVariantIndex = product.variants.findIndex(
               (v) => v.localId === activeId
             )
-            // Find new index based on the item being dropped *over*
+            // Find new index based on the item being dropped over
             const newVariantIndex = product.variants.findIndex(
               (v) => v.localId === overId
             )
 
             if (oldVariantIndex !== -1 && newVariantIndex !== -1) {
-              // Check if variants belong to the *same* product (over.data might be needed if allowing cross-product drop)
+              // Check if variants belong to the same product
               if (product.variants.some((v) => v.localId === overId)) {
                 const movedVariant = product.variants[oldVariantIndex]
                 product.variants.splice(oldVariantIndex, 1)
                 product.variants.splice(newVariantIndex, 0, movedVariant)
-                // product.variants = arrayMove(product.variants, oldVariantIndex, newVariantIndex); // Use arrayMove if not using immer
               } else {
                 console.warn(
                   'Cannot move variant to a different product list (yet).'
@@ -218,7 +240,6 @@ function App() {
   return (
     <div className="container mx-auto p-4 max-w-4xl">
       {' '}
-      {/* Limit width */}
       <h1 className="text-2xl font-semibold mb-4 text-gray-800">
         Monk Upsell & Cross-sell
       </h1>
@@ -251,7 +272,6 @@ function App() {
           <AddProductButton onClick={handleAddProduct} />
         </div>
       </div>
-      {/* Product Picker Modal */}
       <ProductPicker
         isOpen={isPickerOpen}
         onClose={handleClosePicker}

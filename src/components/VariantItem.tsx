@@ -25,13 +25,13 @@ const VariantItem: FC<VariantItemProps> = ({ variant, onUpdateDiscount }) => {
     isDragging,
   } = useSortable({
     id: variant.localId,
-    data: { type: 'VARIANT', variant: variant }, // Add data for context in onDragEnd
+    data: { type: 'VARIANT', variant: variant },
   })
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    zIndex: isDragging ? 10 : undefined, // Keep dragged item on top
+    zIndex: isDragging ? 10 : undefined,
   }
 
   const handleDiscountTypeChange = (type: DiscountType) => {
@@ -51,7 +51,7 @@ const VariantItem: FC<VariantItemProps> = ({ variant, onUpdateDiscount }) => {
       ref={setNodeRef}
       style={style}
       className={clsx(
-        'flex items-center justify-between p-2 bg-gray-50 border border-gray-200 rounded ml-12 mb-1', // Indent variants
+        'flex items-center justify-between p-2 bg-gray-50 border border-gray-200 rounded ml-12 mb-1',
         isDragging && 'opacity-50 shadow-lg'
       )}
     >

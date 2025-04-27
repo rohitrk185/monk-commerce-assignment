@@ -28,19 +28,17 @@ const ProductList: FC<ProductListProps> = ({
   onUpdateProductDiscount,
   onUpdateVariantDiscount,
 }) => {
-  const productIds = products.map((p) => p.localId) // Get local IDs for DND context
+  const productIds = products.map((p) => p.localId)
 
   return (
     <div className="space-y-2">
-      {/* Header (Optional but good for context) */}
+      {/* Header */}
       <div className="hidden md:flex items-center px-3 py-2 text-xs font-semibold text-gray-500 uppercase border-b">
         <span className="w-12 mr-3"></span> {/* Spacer for drag handle */}
         <span className="w-8 mr-2">#</span>
         <span className="flex-grow mr-4">Product</span>
         <span className="w-40 mr-4 text-center">Discount</span>{' '}
-        {/* Adjust width as needed */}
         <span className="w-32 text-right">Actions</span>{' '}
-        {/* Adjust width as needed */}
       </div>
 
       <SortableContext
@@ -49,7 +47,7 @@ const ProductList: FC<ProductListProps> = ({
       >
         {products.map((product, index) => (
           <ProductItem
-            key={product.localId} // Use stable unique local ID
+            key={product.localId}
             product={product}
             index={index}
             totalProducts={products.length}

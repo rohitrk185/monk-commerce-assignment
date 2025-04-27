@@ -32,20 +32,19 @@ const DiscountInput: FC<DiscountInputProps> = ({
       <input
         type="number"
         min="0"
-        step="0.01" // Allow decimals for currency
-        className="p-1 text-sm w-20 outline-none text-right" // Adjust width as needed
+        step="0.01"
+        className="p-1 text-sm w-20 outline-none text-right"
         placeholder={placeholder}
-        value={value ?? ''} // Use empty string if null/undefined
+        value={value ?? ''}
         onChange={handleValueChange}
       />
       <select
         className="p-1 text-sm bg-gray-100 border-l border-gray-300 outline-none"
-        value={type ?? 'percentage'} // Default selection
+        value={type ?? 'percentage'}
         onChange={handleTypeChange}
       >
         <option value="percentage">%</option>
         <option value="flat">Flat</option>{' '}
-        {/* Consider using currency symbol if needed */}
       </select>
     </div>
   )

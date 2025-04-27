@@ -19,12 +19,10 @@ export function useInfiniteScroll({
 }: UseInfiniteScrollOptions) {
   const observer = useRef<IntersectionObserver | null>(null)
 
-  // Use useCallback to ensure the ref callback is stable
   const lastElementRef = useCallback(
     (node: Element | null) => {
       if (loading || !hasMore || disabled) return
 
-      // Disconnect previous observer if node changes or dependencies change
       if (observer.current) observer.current.disconnect()
 
       observer.current = new IntersectionObserver(
@@ -41,7 +39,6 @@ export function useInfiniteScroll({
     [loading, hasMore, onLoadMore, threshold, rootMargin, disabled]
   )
 
-  // Cleanup observer on unmount
   useEffect(() => {
     return () => {
       if (observer.current) {
