@@ -146,58 +146,47 @@ function App() {
     handleClosePicker()
   }
 
-  //  Drag and Drop Handling
+  // Drag and Drop Handling
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       const { active, over } = event
 
       if (!over) return // Dropped outside a droppable area
-
       const activeId = active.id
       const overId = over.id
-
       if (activeId === overId) return // Dropped in the same place
 
       const activeType = active.data.current?.type
       const overType = over.data.current?.type
 
       console.log('Drag End:', { activeId, overId, activeType, overType })
-      console.log('Active Data:', active.data.current)
-      console.log('Over Data:', over.data.current)
+      // console.log('Active Data:', active.data.current); // Keep for debugging if needed
+      // console.log('Over Data:', over.data.current); // Keep for debugging if needed
 
-      setSelectedProducts(
-        produce((draft) => {
-          if (activeType === 'PRODUCT' && overType === 'PRODUCT') {
-            // Reordering Products
-            setSelectedProducts((currentProducts) => {
-              const oldIndex = currentProducts.findIndex(
-                (p) => p.localId === activeId
-              )
-              const newIndex = currentProducts.findIndex(
-                (p) => p.localId === overId
-              )
+      if (activeType === 'PRODUCT' && overType === 'PRODUCT') {
+        // Reordering Products - Update state directly using arrayMove
+        setSelectedProducts((currentProducts) => {
+          const oldIndex = currentProducts.findIndex(
+            (p) => p.localId === activeId
+          )
+          const newIndex = currentProducts.findIndex(
+            (p) => p.localId === overId
+          )
 
-              // console.log(
-              //   'a) oldIndex: ',
-              //   oldIndex,
-              //   '\nb)newIndex: ',
-              //   newIndex,
-              //   '\nc)currentProducts: ',
-              //   currentProducts
-              // )
-
-              if (oldIndex !== -1 && newIndex !== -1) {
-                const newArr = arrayMove(currentProducts, oldIndex, newIndex)
-                // console.log('newArr: ', newArr)
-                return newArr
-              }
-              // Return original array if indices are invalid
-              return currentProducts
-            })
-          } else if (activeType === 'VARIANT' && overType === 'VARIANT') {
-            // Reordering Variants within the same product
-            // Find the product containing these variants
+          if (oldIndex !== -1 && newIndex !== -1) {
+            // Return the NEW array created by arrayMove
+            return arrayMove(currentProducts, oldIndex, newIndex)
+          }
+          // Return original array if indices are invalid
+          console.warn('Product DnD: Indices not found.')
+          return currentProducts
+        })
+      } else if (activeType === 'VARIANT' && overType === 'VARIANT') {
+        // Reordering Variants - Use produce for nested state mutation
+        setSelectedProducts(
+          produce((draft) => {
             let productIndex = -1
+            // Find the product containing the dragged variant
             for (let i = 0; i < draft.length; i++) {
               if (draft[i].variants.some((v) => v.localId === activeId)) {
                 productIndex = i
@@ -207,39 +196,47 @@ function App() {
 
             if (productIndex !== -1) {
               const product = draft[productIndex]
-              const oldVariantIndex = product.variants.findIndex(
-                (v) => v.localId === activeId
-              )
-              // Find new index based on the item being dropped over
-              const newVariantIndex = product.variants.findIndex(
-                (v) => v.localId === overId
-              )
+              // Ensure the drop target variant is within the SAME product
+              if (product.variants.some((v) => v.localId === overId)) {
+                const oldVariantIndex = product.variants.findIndex(
+                  (v) => v.localId === activeId
+                )
+                const newVariantIndex = product.variants.findIndex(
+                  (v) => v.localId === overId
+                )
 
-              if (oldVariantIndex !== -1 && newVariantIndex !== -1) {
-                // Check if variants belong to the same product
-                if (product.variants.some((v) => v.localId === overId)) {
-                  const movedVariant = product.variants[oldVariantIndex]
-                  product.variants.splice(oldVariantIndex, 1)
-                  product.variants.splice(newVariantIndex, 0, movedVariant)
+                if (oldVariantIndex !== -1 && newVariantIndex !== -1) {
+                  // Use arrayMove directly on the draft's nested array
+                  product.variants = arrayMove(
+                    product.variants,
+                    oldVariantIndex,
+                    newVariantIndex
+                  )
                 } else {
                   console.warn(
-                    'Cannot move variant to a different product list (yet).'
+                    'Variant DnD: Variant indices not found within product.'
                   )
                 }
+              } else {
+                console.warn('Cannot move variant between different products.')
               }
+            } else {
+              console.warn(
+                'Variant DnD: Product not found for dragged variant.'
+              )
             }
-          } else {
-            console.log(
-              'Unhandled drag/drop combination:',
-              activeType,
-              'over',
-              overType
-            )
-          }
-        })
-      )
+          })
+        )
+      } else {
+        console.log(
+          'Unhandled drag/drop combination:',
+          activeType,
+          'over',
+          overType
+        )
+      }
     },
-    [setSelectedProducts]
+    [] // Keep dependencies empty as only using state updater function pattern
   )
 
   return (
