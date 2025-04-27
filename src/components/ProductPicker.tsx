@@ -277,7 +277,7 @@ const ProductPicker: FC<ProductPickerProps> = ({
         allVariantIds.forEach((id) => {
           delete newSelected[id]
         })
-        console.log(`Deselecting all variants for product ${product.id}`)
+        // console.log(`Deselecting all variants for product ${product.id}`)
       } else {
         //  SELECT ALL
         // If not all are selected, add/overwrite all variants for this product
@@ -293,7 +293,7 @@ const ProductPicker: FC<ProductPickerProps> = ({
             discountValue: prevSelected[localVariantId]?.discountValue ?? null,
           }
         })
-        console.log(`Selecting all variants for product ${product.id}`)
+        // console.log(`Selecting all variants for product ${product.id}`)
       }
 
       return newSelected // Return the updated selection state
@@ -404,10 +404,10 @@ const ProductPicker: FC<ProductPickerProps> = ({
   // Function for InfiniteLoader to trigger loading more items
   const loadMoreItems = useCallback(() => {
     if (isLoading || !hasMore) {
-      console.log('InfiniteLoader: Skipping loadMoreItems')
+      // console.log('InfiniteLoader: Skipping loadMoreItems')
       return
     }
-    console.log('InfiniteLoader: Triggering loadMoreItems')
+    // console.log('InfiniteLoader: Triggering loadMoreItems')
     return loadProducts(debouncedSearchTerm, page)
   }, [isLoading, hasMore, loadProducts, debouncedSearchTerm, page])
 

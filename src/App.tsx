@@ -159,7 +159,7 @@ function App() {
       const activeType = active.data.current?.type
       const overType = over.data.current?.type
 
-      console.log('Drag End:', { activeId, overId, activeType, overType })
+      // console.log('Drag End:', { activeId, overId, activeType, overType })
       // console.log('Active Data:', active.data.current); // Keep for debugging if needed
       // console.log('Over Data:', over.data.current); // Keep for debugging if needed
 
@@ -227,14 +227,15 @@ function App() {
             }
           })
         )
-      } else {
-        console.log(
-          'Unhandled drag/drop combination:',
-          activeType,
-          'over',
-          overType
-        )
       }
+      // else {
+      //   console.log(
+      //     'Unhandled drag/drop combination:',
+      //     activeType,
+      //     'over',
+      //     overType
+      //   )
+      // }
     },
     [] // Keep dependencies empty as only using state updater function pattern
   )
