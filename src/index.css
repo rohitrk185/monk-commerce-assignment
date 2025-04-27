@@ -1,0 +1,18 @@
+@import 'tailwindcss';
+
+/* Add any global base styles here */
+body {
+  font-family: sans-serif; /* Example base font */
+  background-color: #f0f2f5; /* Light grey background like the image */
+  padding: 2rem; /* Add some padding */
+}
+
+/* Style for the modal overlay */
+.headlessui-dialog-overlay {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background-color: rgba(0, 0, 0, 0.3);
+}
